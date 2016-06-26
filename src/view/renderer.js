@@ -47,6 +47,7 @@ export function FacePrimitive() {
   this.fill = true;
   this.stroke = true;
   this.close_path = true;
+  this.blended = true;
 
   this.fr = 0;
   this.fg = 1;
@@ -94,18 +95,22 @@ export class FaceRenderer {
 
     this.primitive_buffer.forEach(prim => {
       if (prim.fill) {
-        context.fillStyle = css_color(prim.fr, prim.fg, prim.fb, prim.fa);
+        context.fillStyle = css_color(prim.fr, prim.fg, prim.fb, prim.fa, prim.blended);
       }
       if (prim.stroke) {
         context.lineWidth = prim.lw;
-        context.strokeStyle = css_color(prim.sr, prim.sg, prim.sb, prim.sa);
+        context.strokeStyle = css_color(prim.sr, prim.sg, prim.sb, prim.sa, prim.blended);
       }
       context.beginPath();
 
       for (var p = prim._offset, i = 0; i < prim._count; i++) {
         const px = fragcoords[p++];
         const py = fragcoords[p++];
-        context.lineTo(px, py);
+        if (i) {
+          context.lineTo(px, py);
+        } else {
+          context.moveTo(px, py);
+        }
       }
 
       if (prim.close_path) {
@@ -136,8 +141,9 @@ export class FaceRenderer {
   }
 }
 
-function css_color(r,g,b,a) {
+function css_color(r,g,b,a, blended) {
   const { round } = Math;
-  return `rgba(${round(255*r)},${round(255*g)},${round(255*b)},${a})`;
+  return blended ? `rgba(${round(255*r)},${round(255*g)},${round(255*b)},${a})`
+    : `rgb(${round(255*r)},${round(255*g)},${round(255*b)})`;
 }
 

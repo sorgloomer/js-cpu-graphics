@@ -33,19 +33,19 @@ export class View {
 
   render(t) {
 
+    const common_rotation = Matrix4.rotation(1, 2, -0.079 * t)
+      .multiply(Matrix4.rotation(0, 2, 0.2 * t));
+    const view = Matrix4.translation_from(0, 0, 15);
+    const projection = Matrix4.projection(1).multiply(
+      Matrix4.scaling_from(200, -200, 1, 1)
+    ).multiply(
+      Matrix4.translation_from(250, 250, 0)
+    );
     function draw_cube(tx, ty, tz) {
 
-      const model = Matrix4.translation_from(tx, ty, tz)
-        .multiply(Matrix4.rotation(1, 2, -0.079 * t))
-        .multiply(Matrix4.rotation(0, 2, 0.2 * t));
-      const view = Matrix4.translation_from(0, 0, 10);
-      const projection = Matrix4.projection(1).multiply(
-        Matrix4.scaling_from(200, -200, 1, 1)
-      ).multiply(
-        Matrix4.translation_from(250, 250, 0)
-      );
-      const mv = model.multiply(view);
-      const mvp = mv.multiply(projection);
+      const mxM = Matrix4.translation_from(tx, ty, tz).multiply(common_rotation);
+      const mxMV = mxM.multiply(view);
+      const mxMVP = mxMV.multiply(projection);
 
 
       view_zip(
@@ -53,8 +53,8 @@ export class View {
           const position = this.temp_vec4s[0];
           const temp = this.temp_vec4s[1];
           src.expand_to(1, position);
-          mv.multiply_vector_to(position, tran);
-          mvp.multiply_vector_to(position, temp);
+          mxMV.multiply_vector_to(position, tran);
+          mxMVP.multiply_vector_to(position, temp);
           temp.normal_by_last_to(proj);
         },
         this.cuboid.vertices, this.transformed, this.projected
@@ -66,7 +66,7 @@ export class View {
         const center = this.temp_vec4s[2];
         face.normal.expand_to(0, normal);
 
-        model.multiply_vector_to(normal, worldnormal);
+        mxM.multiply_vector_to(normal, worldnormal);
 
         const mapper = this.temp_viewmapper;
         mapper.proxied = face;
@@ -99,10 +99,10 @@ export class View {
     this.face_renderer.reset();
 
 
-    for (var dx = -1; dx <= 1; dx++) {
-      for (var dy = -1; dy <= 1; dy++) {
-        for (var dz = -1; dz <= 1; dz++) {
-          this::draw_cube(dx * 2.5, dy * 2.5, dz * 2.5);
+    for (var dx = -3; dx < 3; dx++) {
+      for (var dy = -3; dy < 3; dy++) {
+        for (var dz = -3; dz < 3; dz++) {
+          this::draw_cube((dx + 0.5) * 2.3, (dy + 0.5) * 2.3, (dz + 0.5) * 2.3);
         }
       }
     }

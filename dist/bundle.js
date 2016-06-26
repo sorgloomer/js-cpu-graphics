@@ -971,6 +971,7 @@
     this.fill = true;
     this.stroke = true;
     this.close_path = true;
+    this.blended = true;
 
     this.fr = 0;
     this.fg = 1;
@@ -1027,18 +1028,22 @@
 
         this.primitive_buffer.forEach(function (prim) {
           if (prim.fill) {
-            context.fillStyle = css_color(prim.fr, prim.fg, prim.fb, prim.fa);
+            context.fillStyle = css_color(prim.fr, prim.fg, prim.fb, prim.fa, prim.blended);
           }
           if (prim.stroke) {
             context.lineWidth = prim.lw;
-            context.strokeStyle = css_color(prim.sr, prim.sg, prim.sb, prim.sa);
+            context.strokeStyle = css_color(prim.sr, prim.sg, prim.sb, prim.sa, prim.blended);
           }
           context.beginPath();
 
           for (var p = prim._offset, i = 0; i < prim._count; i++) {
             var px = fragcoords[p++];
             var py = fragcoords[p++];
-            context.lineTo(px, py);
+            if (i) {
+              context.lineTo(px, py);
+            } else {
+              context.moveTo(px, py);
+            }
           }
 
           if (prim.close_path) {
@@ -1074,10 +1079,10 @@
     return FaceRenderer;
   }();
 
-  function css_color(r, g, b, a) {
+  function css_color(r, g, b, a, blended) {
     var round = Math.round;
 
-    return "rgba(" + round(255 * r) + "," + round(255 * g) + "," + round(255 * b) + "," + a + ")";
+    return blended ? "rgba(" + round(255 * r) + "," + round(255 * g) + "," + round(255 * b) + "," + a + ")" : "rgb(" + round(255 * r) + "," + round(255 * g) + "," + round(255 * b) + ")";
   }
 
   var Matrix4 = Matrix(4);
@@ -1110,21 +1115,22 @@
       key: "render",
       value: function render(t) {
 
+        var common_rotation = Matrix4.rotation(1, 2, -0.079 * t).multiply(Matrix4.rotation(0, 2, 0.2 * t));
+        var view = Matrix4.translation_from(0, 0, 15);
+        var projection = Matrix4.projection(1).multiply(Matrix4.scaling_from(200, -200, 1, 1)).multiply(Matrix4.translation_from(250, 250, 0));
         function draw_cube(tx, ty, tz) {
           var _this2 = this;
 
-          var model = Matrix4.translation_from(tx, ty, tz).multiply(Matrix4.rotation(1, 2, -0.079 * t)).multiply(Matrix4.rotation(0, 2, 0.2 * t));
-          var view = Matrix4.translation_from(0, 0, 10);
-          var projection = Matrix4.projection(1).multiply(Matrix4.scaling_from(200, -200, 1, 1)).multiply(Matrix4.translation_from(250, 250, 0));
-          var mv = model.multiply(view);
-          var mvp = mv.multiply(projection);
+          var mxM = Matrix4.translation_from(tx, ty, tz).multiply(common_rotation);
+          var mxMV = mxM.multiply(view);
+          var mxMVP = mxMV.multiply(projection);
 
           view_zip(function (src, tran, proj) {
             var position = _this2.temp_vec4s[0];
             var temp = _this2.temp_vec4s[1];
             src.expand_to(1, position);
-            mv.multiply_vector_to(position, tran);
-            mvp.multiply_vector_to(position, temp);
+            mxMV.multiply_vector_to(position, tran);
+            mxMVP.multiply_vector_to(position, temp);
             temp.normal_by_last_to(proj);
           }, this.cuboid.vertices, this.transformed, this.projected);
 
@@ -1134,7 +1140,7 @@
             var center = _this2.temp_vec4s[2];
             face.normal.expand_to(0, normal);
 
-            model.multiply_vector_to(normal, worldnormal);
+            mxM.multiply_vector_to(normal, worldnormal);
 
             var mapper = _this2.temp_viewmapper;
             mapper.proxied = face;
@@ -1166,10 +1172,10 @@
 
         this.face_renderer.reset();
 
-        for (var dx = -1; dx <= 1; dx++) {
-          for (var dy = -1; dy <= 1; dy++) {
-            for (var dz = -1; dz <= 1; dz++) {
-              draw_cube.call(this, dx * 2.5, dy * 2.5, dz * 2.5);
+        for (var dx = -3; dx < 3; dx++) {
+          for (var dy = -3; dy < 3; dy++) {
+            for (var dz = -3; dz < 3; dz++) {
+              draw_cube.call(this, (dx + 0.5) * 2.3, (dy + 0.5) * 2.3, (dz + 0.5) * 2.3);
             }
           }
         }
