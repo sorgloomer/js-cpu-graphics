@@ -1,11 +1,6 @@
 import { assert } from "../utils/assert";
-import { template } from "../utils/template";
-import { doubles } from "../utils/allocators";
+import { template, invalidTemplate } from "../utils/template";
 import { Vector } from "./vertices";
-
-export function Matrix(n, allocator = doubles) {
-  return _matrix_template(n, allocator);
-}
 
 class TransposedView {
   constructor(matrix) {
@@ -19,9 +14,21 @@ class TransposedView {
   }
 }
 
-const _matrix_template = template((n, allocator) => {
-  const _vector = Vector(n, allocator);
+export const Matrix = template(n => {
+  if (n < 1) {
+    return invalidTemplate("Matrix", n);
+  }
+
+  const _vector = Vector(n);
   const item_count = n * n;
+
+  function new_vector() {
+    return new _vector();
+  }
+
+  function allocate_buffer() {
+    return new Float64Array(item_count);
+  }
 
   class MatrixTemplate {
     static get N() {
@@ -32,16 +39,21 @@ const _matrix_template = template((n, allocator) => {
       return _vector;
     }
 
-    constructor() {
-      this.items = allocator(item_count);
+    static get SIZE() {
+      return item_count;
+    }
+
+    constructor(buffer = allocate_buffer(), offset = 0) {
+      this.buffer = buffer;
+      this.offset = offset;
     }
 
     get_item(i, j) {
-      return this.items[i * n + j];
+      return this.buffer[this.offset + i * n + j];
     }
 
     set_item(i, j, v) {
-      return this.items[i * n + j] = v;
+      return this.buffer[this.offset + i * n + j] = v;
     }
 
     multiply(b) {
@@ -58,8 +70,7 @@ const _matrix_template = template((n, allocator) => {
       return to;
     }
 
-    multiply_vector(v) {
-      const to = new _vector();
+    multiply_vector_to(v, to) {
       for (var i = 0; i < n; i++) {
         var acc = 0;
         for (var j = 0; j < n; j++) {
@@ -69,8 +80,17 @@ const _matrix_template = template((n, allocator) => {
       }
       return to;
     }
+
+    multiply_vector(v) {
+      return this.multiply_vector_to(v, new_vector());
+    }
+
+    multiply_vector_left_to(v, to) {
+      return new TransposedView(this)::this.multiply_vector_to(v, to);
+    }
+
     multiply_vector_left(v) {
-      return new TransposedView(this)::this.multiply_vector(v);
+      return this.multiply_vector_left_to(v, new_vector());
     }
 
     clone() {

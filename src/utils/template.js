@@ -35,3 +35,12 @@ export function template(factory) {
   const cache = new Template(factory);
   return (...args) => cache.get_item(...args);
 }
+
+
+export function invalidTemplate(name, ...args) {
+  const shown_name = name + JSON.stringify(args);
+  return function InvalidTemplate() {
+    throw new Error("InvalidTemplate: " + shown_name);
+  };
+}
+
