@@ -325,34 +325,79 @@
           return this.divide_to(s, new_vector());
         }
       }, {
-        key: "normal_by_w_to",
-        value: function normal_by_w_to(to) {
+        key: "abs2",
+        value: function abs2() {
+          var result = 0;
+          for (var i = 0; i < n; i++) {
+            var x = _get_item(this, i);
+            result += x * x;
+          }
+          return result;
+        }
+      }, {
+        key: "abs",
+        value: function abs() {
+          return Math.sqrt(this.abs2());
+        }
+      }, {
+        key: "normalized_to",
+        value: function normalized_to(to) {
+          return this.divide_to(this.abs(), to);
+        }
+      }, {
+        key: "normalized",
+        value: function normalized() {
+          return this.normalized_to(new_vector());
+        }
+      }, {
+        key: "normal_by_last_to",
+        value: function normal_by_last_to(to) {
           return this.divide_to(this.w, to);
         }
       }, {
-        key: "normal_by_w",
-        value: function normal_by_w() {
-          return this.normal_by_w_to(new_vector());
+        key: "normal_by_last",
+        value: function normal_by_last() {
+          return this.normal_by_last_to(new_vector());
         }
       }, {
         key: "x",
         get: function get() {
           return _get_item(this, 0);
+        },
+        set: function set(v) {
+          return _set_item(this, 0, v);
         }
       }, {
         key: "y",
         get: function get() {
           return _get_item(this, 1);
+        },
+        set: function set(v) {
+          return _set_item(this, 1, v);
         }
       }, {
         key: "z",
         get: function get() {
           return _get_item(this, 2);
+        },
+        set: function set(v) {
+          return _set_item(this, 2, v);
         }
       }, {
         key: "w",
         get: function get() {
+          return _get_item(this, 3);
+        },
+        set: function set(v) {
+          return _set_item(this, 3, v);
+        }
+      }, {
+        key: "last",
+        get: function get() {
           return _get_item(this, n - 1);
+        },
+        set: function set(v) {
+          return _set_item(this, n - 1, v);
         }
       }], [{
         key: "sum_to",
@@ -640,10 +685,10 @@
         }
       }, {
         key: "projection",
-        value: function projection() {
+        value: function projection(hdst) {
           var to = MatrixTemplate.identity();
           to.set_item(n - 1, n - 1, 0);
-          to.set_item(n - 2, n - 1, 1);
+          to.set_item(n - 2, n - 1, hdst);
           return to;
         }
       }, {
@@ -756,27 +801,6 @@
     return ViewArray;
   }();
 
-  function zip(fn) {
-    for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-      args[_key - 1] = arguments[_key];
-    }
-
-    var length = args[0].length;
-    var temp = new Array(length);
-    for (var i = 0; i < length; i++) {
-      for (var j = 0; j < args.length; j++) {
-        temp[j] = args[j][i];
-      }
-      fn.apply(undefined, temp);
-    }
-  }
-
-  function view_forEach(arr, fn) {
-    for (var i = 0; i < arr.length; i++) {
-      fn(arr.index(i), i, arr);
-    }
-  }
-
   function view_zip(fn) {
     for (var _len2 = arguments.length, args = Array(_len2 > 1 ? _len2 - 1 : 0), _key2 = 1; _key2 < _len2; _key2++) {
       args[_key2 - 1] = arguments[_key2];
@@ -836,8 +860,12 @@
       value: function index(j) {
         var g = gray_code(j);
         var mask = this._mask;
+        // this inserts a `0` bit at position `i`, shifting left the more significant
+        // bits
         var top = (g & mask) << 1 | g & ~mask;
         var swapped = this.k ? this.cuboid._all_bits : 0;
+        // if the bits are negated, the gray code gets reversed and the inserted `0`
+        // bit turns into `1`
         return top ^ swapped;
       }
     }]);
@@ -884,17 +912,176 @@
     return Cuboid;
   }();
 
+  var PointBuffer = function () {
+    function PointBuffer() {
+      classCallCheck(this, PointBuffer);
+
+      this.buffer = new Float32Array(256);
+      this.offset = 0;
+    }
+
+    createClass(PointBuffer, [{
+      key: "add",
+      value: function add(a) {
+        if (this.offset + 1 >= this.buffer.length) {
+          this._expand();
+        }
+        this.buffer[this.offset++] = a;
+      }
+    }, {
+      key: "add2",
+      value: function add2(a, b) {
+        if (this.offset + 2 >= this.buffer.length) {
+          this._expand();
+        }
+        this.buffer[this.offset++] = a;
+        this.buffer[this.offset++] = b;
+      }
+    }, {
+      key: "add3",
+      value: function add3(a, b, c) {
+        if (this.offset + 3 >= this.buffer.length) {
+          this._expand();
+        }
+        this.buffer[this.offset++] = a;
+        this.buffer[this.offset++] = b;
+        this.buffer[this.offset++] = c;
+      }
+    }, {
+      key: "reset",
+      value: function reset() {
+        this.offset = 0;
+      }
+    }, {
+      key: "_expand",
+      value: function _expand() {
+        var temp = new Float32Array(Math.round(this.buffer.length * 1.5));
+        temp.set(this.buffer);
+        this.buffer = temp;
+      }
+    }]);
+    return PointBuffer;
+  }();
+
+  function FacePrimitive() {
+    this._offset = 0;
+    this._count = 0;
+    this.dist = 0;
+
+    this.fill = true;
+    this.stroke = true;
+    this.close_path = true;
+
+    this.fr = 0;
+    this.fg = 1;
+    this.fb = 0;
+    this.fa = 1;
+    this.sr = 0;
+    this.sg = 0;
+    this.sb = 0;
+    this.sa = 1;
+    this.lw = 1;
+  }
+
+  var FaceRenderer = function () {
+    function FaceRenderer() {
+      classCallCheck(this, FaceRenderer);
+
+      this.point_buffer = new PointBuffer();
+      this.primitive_buffer = [];
+    }
+
+    createClass(FaceRenderer, [{
+      key: "_next",
+      value: function _next() {
+        var result = new FacePrimitive();
+        this.primitive_buffer.push(result);
+        return result;
+      }
+    }, {
+      key: "add_face",
+      value: function add_face(buffer, indices) {
+        var offset = this.point_buffer.offset;
+        var length = indices.length;
+        for (var i = 0; i < length; i++) {
+          var vec = buffer.index(indices.index(i));
+          this.point_buffer.add2(vec.x, vec.y);
+        }
+        var result = this._next();
+        result._offset = offset;
+        result._count = length;
+        return result;
+      }
+    }, {
+      key: "prepare",
+      value: function prepare() {
+        sort(this.primitive_buffer, function (p) {
+          return -p.dist;
+        });
+      }
+    }, {
+      key: "draw",
+      value: function draw(context) {
+        context.lineJoin = "round";
+        var fragcoords = this.point_buffer.buffer;
+
+        this.primitive_buffer.forEach(function (prim) {
+          if (prim.fill) {
+            context.fillStyle = css_color(prim.fr, prim.fg, prim.fb, prim.fa);
+          }
+          if (prim.stroke) {
+            context.lineWidth = prim.lw;
+            context.strokeStyle = css_color(prim.sr, prim.sg, prim.sb, prim.sa);
+          }
+          context.beginPath();
+
+          for (var p = prim._offset, i = 0; i < prim._count; i++) {
+            var px = fragcoords[p++];
+            var py = fragcoords[p++];
+            context.lineTo(px, py);
+          }
+
+          if (prim.close_path) {
+            context.closePath();
+          }
+          if (prim.fill) {
+            context.fill();
+          }
+          if (prim.stroke) {
+            context.stroke();
+          }
+        });
+      }
+    }, {
+      key: "clear",
+      value: function clear(context, canvas) {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }, {
+      key: "reset",
+      value: function reset() {
+        this.point_buffer.reset();
+        this.primitive_buffer.length = 0;
+      }
+    }, {
+      key: "render",
+      value: function render(context, canvas) {
+        this.prepare();
+        this.clear(context, canvas);
+        this.draw(context, canvas);
+      }
+    }]);
+    return FaceRenderer;
+  }();
+
+  function css_color(r, g, b, a) {
+    var round = Math.round;
+
+    return "rgba(" + round(255 * r) + "," + round(255 * g) + "," + round(255 * b) + "," + a + ")";
+  }
+
   var Matrix4 = Matrix(4);
   var Vector4 = Vector(4);
-
-  var FaceData = function FaceData() {
-    classCallCheck(this, FaceData);
-
-    this.face = null;
-    this.intensity = 0;
-    this.depth = 0;
-    this.color = 0;
-  };
 
   var View = function () {
     function View(canvas) {
@@ -908,104 +1095,86 @@
       this.cuboid = new Cuboid(3);
       this.transformed = new ArrayView(Vector(4), this.cuboid.vertices.length);
       this.projected = new ArrayView(Vector(4), this.cuboid.vertices.length);
-      this.faces = this.cuboid.faces.map(function () {
-        return new FaceData();
-      });
 
-      this.light_dir = Vector4.from(1, 1, 0, 0);
+      this.light_dir = Vector4.from(1, 1, 0, 0).normalized();
 
       this.temp_vec4s = new Bulk(Vector4).allocate(5);
-      this.temp_array = [];
       this.temp_viewmapper = new ViewMap(null, function (i) {
         return _this.transformed.index(i);
       });
+
+      this.face_renderer = new FaceRenderer();
     }
 
     createClass(View, [{
       key: "render",
       value: function render(t) {
-        var _this2 = this;
 
-        var model = Matrix4.rotation(1, 2, -0.13 * t).multiply(Matrix4.rotation(0, 2, 0.6 * t));
-        var view = Matrix4.translation_from(0, 0, 5);
-        var projection = Matrix4.projection().multiply(Matrix4.scaling_from(200, -200, 1, 1)).multiply(Matrix4.translation_from(250, 250, 0));
-        var mvp = model.multiply(view).multiply(projection);
+        function draw_cube(tx, ty, tz) {
+          var _this2 = this;
 
-        view_zip(function (src, tran, proj) {
-          var position = _this2.temp_vec4s[0];
-          src.expand_to(1, position);
-          mvp.multiply_vector_to(position, tran);
-          tran.normal_by_w_to(proj);
-        }, this.cuboid.vertices, this.transformed, this.projected);
+          var model = Matrix4.translation_from(tx, ty, tz).multiply(Matrix4.rotation(1, 2, -0.079 * t)).multiply(Matrix4.rotation(0, 2, 0.2 * t));
+          var view = Matrix4.translation_from(0, 0, 10);
+          var projection = Matrix4.projection(1).multiply(Matrix4.scaling_from(200, -200, 1, 1)).multiply(Matrix4.translation_from(250, 250, 0));
+          var mv = model.multiply(view);
+          var mvp = mv.multiply(projection);
 
-        zip(function (face, data) {
-          data.face = face;
+          view_zip(function (src, tran, proj) {
+            var position = _this2.temp_vec4s[0];
+            var temp = _this2.temp_vec4s[1];
+            src.expand_to(1, position);
+            mv.multiply_vector_to(position, tran);
+            mvp.multiply_vector_to(position, temp);
+            temp.normal_by_last_to(proj);
+          }, this.cuboid.vertices, this.transformed, this.projected);
 
-          var normal = _this2.temp_vec4s[0];
-          var worldnormal = _this2.temp_vec4s[1];
-          var center = _this2.temp_vec4s[2];
-          face.normal.expand_to(0, normal);
+          this.cuboid.faces.forEach(function (face) {
+            var normal = _this2.temp_vec4s[0];
+            var worldnormal = _this2.temp_vec4s[1];
+            var center = _this2.temp_vec4s[2];
+            face.normal.expand_to(0, normal);
 
-          model.multiply_vector_to(normal, worldnormal);
+            model.multiply_vector_to(normal, worldnormal);
 
-          var mapper = _this2.temp_viewmapper;
-          mapper.proxied = face;
-          Vector4.average_to(mapper, center);
+            var mapper = _this2.temp_viewmapper;
+            mapper.proxied = face;
+            Vector4.average_to(mapper, center);
 
-          var diffuse = worldnormal.dot(_this2.light_dir);
-          data.intensity = Math.max(0, diffuse) * 0.5 + 0.5;
-          data.depth = center.z;
-        }, this.cuboid.faces, this.faces);
+            var cosa = worldnormal.dot(_this2.light_dir);
+            var diffuse = Math.max(cosa, 0);
 
-        sort(this.faces, function (i) {
-          return -i.depth;
-        });
+            var specular = Math.pow(diffuse, 5);
 
-        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            var intensity = Math.max(0, diffuse) * 0.5 + 0.5;
 
-        this.context.strokeStyle = "black";
-        this.context.lineWidth = 2;
-        this.context.lineJoin = "round";
+            var primitive = _this2.face_renderer.add_face(_this2.projected, face);
 
-        function css_color(r, g, b) {
-          var round = Math.round;
+            primitive.fr = intensity * 0.50;
+            primitive.fg = intensity * 0.85;
+            primitive.fb = intensity * 0.95;
 
-          return "rgb(" + round(255 * r) + "," + round(255 * g) + "," + round(255 * b) + ")";
+            primitive.fr += specular * (1 - primitive.fr);
+            primitive.fg += specular * (1 - primitive.fg);
+            primitive.fb += specular * (1 - primitive.fb);
+
+            primitive.fa = 0.70 + specular * 0.15;
+
+            center.w = 0;
+            primitive.dist = center.abs();
+          });
         }
 
-        var _iteratorNormalCompletion = true;
-        var _didIteratorError = false;
-        var _iteratorError = undefined;
+        this.face_renderer.reset();
 
-        try {
-          for (var _iterator = this.faces[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            var face = _step.value;
-
-            this.context.fillStyle = css_color(face.intensity, face.intensity * 0.2, face.intensity * 0.1);
-            this.context.beginPath();
-
-            view_forEach(face.face, function (i) {
-              var fragcoord = _this2.projected.index(i);
-              _this2.context.lineTo(fragcoord.x, fragcoord.y);
-            });
-            this.context.closePath();
-            this.context.fill();
-            this.context.stroke();
-          }
-        } catch (err) {
-          _didIteratorError = true;
-          _iteratorError = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion && _iterator.return) {
-              _iterator.return();
-            }
-          } finally {
-            if (_didIteratorError) {
-              throw _iteratorError;
+        for (var dx = -1; dx <= 1; dx++) {
+          for (var dy = -1; dy <= 1; dy++) {
+            for (var dz = -1; dz <= 1; dz++) {
+              draw_cube.call(this, dx * 2.5, dy * 2.5, dz * 2.5);
             }
           }
         }
+
+        this.face_renderer.render(this.context, this.canvas);
       }
     }]);
     return View;

@@ -38,8 +38,12 @@ class CuboidFace {
   index(j) {
     const g = gray_code(j);
     const mask = this._mask;
+    // this inserts a `0` bit at position `i`, shifting left the more significant
+    // bits
     const top = ((g & mask) << 1) | (g & (~mask));
     const swapped = this.k ? this.cuboid._all_bits : 0;
+    // if the bits are negated, the gray code gets reversed and the inserted `0`
+    // bit turns into `1`
     return top ^ swapped;
   }
 }

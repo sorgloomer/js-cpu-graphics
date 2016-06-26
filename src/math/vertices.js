@@ -150,11 +150,31 @@ export const Vector = template(n => {
       return this.divide_to(s, new_vector());
     }
 
-    normal_by_w_to(to) {
+    abs2() {
+      var result = 0;
+      for (var i = 0; i < n; i++) {
+        const x = _get_item(this, i);
+        result += x * x;
+      }
+      return result;
+    }
+
+    abs() {
+      return Math.sqrt(this.abs2());
+    }
+
+    normalized_to(to) {
+      return this.divide_to(this.abs(), to);
+    }
+    normalized() {
+      return this.normalized_to(new_vector());
+    }
+
+    normal_by_last_to(to) {
       return this.divide_to(this.w, to);
     }
-    normal_by_w() {
-      return this.normal_by_w_to(new_vector());
+    normal_by_last() {
+      return this.normal_by_last_to(new_vector());
     }
 
     static sum_to(vectors, acc) {
@@ -179,14 +199,32 @@ export const Vector = template(n => {
     get x() {
       return _get_item(this, 0);
     }
+    set x(v) {
+      return _set_item(this, 0, v);
+    }
     get y() {
       return _get_item(this, 1);
+    }
+    set y(v) {
+      return _set_item(this, 1, v);
     }
     get z() {
       return _get_item(this, 2);
     }
+    set z(v) {
+      return _set_item(this, 2, v);
+    }
     get w() {
+      return _get_item(this, 3);
+    }
+    set w(v) {
+      return _set_item(this, 3, v);
+    }
+    get last() {
       return _get_item(this, n - 1);
+    }
+    set last(v) {
+      return _set_item(this, n - 1, v);
     }
   }
 

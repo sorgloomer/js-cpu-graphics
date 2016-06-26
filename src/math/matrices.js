@@ -129,10 +129,10 @@ export const Matrix = template(n => {
       return to;
     }
 
-    static projection() {
+    static projection(hdst) {
       const to = MatrixTemplate.identity();
       to.set_item(n - 1, n - 1, 0);
-      to.set_item(n - 2, n - 1, 1);
+      to.set_item(n - 2, n - 1, hdst);
       return to;
     }
 
