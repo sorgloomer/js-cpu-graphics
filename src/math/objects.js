@@ -1,9 +1,5 @@
 import { Vector, ArrayView } from "./vertices";
 
-function gray_code(i) {
-  return i ^ (i >>> 1);
-}
-
 export function cuboid_vertices(n, array = null) {
   const { round } = Math;
   n = round(n);
@@ -26,53 +22,51 @@ export function cuboid_vertices(n, array = null) {
 }
 
 class CuboidFace {
-  constructor(cuboid, i, k, normal) {
-    this.cuboid = cuboid;
-    this.length = cuboid._face_index_count;
-    this.i = i;
-    this.k = k;
-    this.normal = normal;
-    this._mask = (~0) << i;
+  constructor(vi, vj, rest, parity) {
+    this.length = 4;
+    this.vi = vi;
+    this.vj = vj;
+    this.rest = rest;
+    this.parity = parity;
+    this.rest_shift = insert_zero_at(insert_zero_at(rest, vi), vj);
+
+    function insert_zero_at(x, i) {
+      var mask = (~0) << i;
+      return ((x & mask) << 1) | (x & ~mask);
+    }
   }
 
-  index(j) {
-    const g = gray_code(j);
-    const mask = this._mask;
-    // this inserts a `0` bit at position `i`, shifting left the more significant
-    // bits
-    const top = ((g & mask) << 1) | (g & (~mask));
-    const swapped = this.k ? this.cuboid._all_bits : 0;
-    // if the bits are negated, the gray code gets reversed and the inserted `0`
-    // bit turns into `1`
-    return top ^ swapped;
+  index(i) {
+    if (this.parity) {
+      i = 3 - i;
+    }
+    const g = gray_code(i);
+    return this.rest_shift | ((g & 1) << this.vi) | (((g >>> 1) & 1) << this.vj);
+
+    function gray_code(i) {
+      return i ^ (i >>> 1);
+    }
   }
 }
+
 export class Cuboid {
-  constructor(n, array = undefined) {
+  constructor(n, vertex_buffer_array = undefined) {
     this.N = n;
     this.VectorN = Vector(n);
-    this.vertices = cuboid_vertices(n, array);
-    this._all_bits = ~((~0) << n);
-    this._face_index_count = 1 << (n - 1);
-
-    this.normals = this._generate_normals();
+    this.vertices = cuboid_vertices(n, vertex_buffer_array);
     this.faces = this._generate_faces();
   }
 
-  _generate_normals() {
-    const normals = new ArrayView(this.VectorN, 2 * this.N);
-    for (var i = 0, p = 0; i < this.N; i++) {
-      normals.index(p++).set_to_axis(i, -1);
-      normals.index(p++).set_to_axis(i, +1);
-    }
-    return normals;
-  }
   _generate_faces() {
-    var result = [];
-    const normals = this.normals;
-    for (var i = 0, p = 0; i < this.N; i++) {
-      result.push(new CuboidFace(this, i, 0, normals.index_ref(p++)));
-      result.push(new CuboidFace(this, i, 1, normals.index_ref(p++)));
+    var result = [], max_rest = 1 << (this.N - 2);
+    var parity1 = 0;
+    for (var i = 0; i < this.N; i++) {
+      for (var j = i + 1; j < this.N; j++) {
+        for (var r = 0; r < max_rest; r++) {
+          result.push(new CuboidFace(i, j, r, parity1));
+        }
+        parity1 = parity1 ^ 1;
+      }
     }
     return result;
   }

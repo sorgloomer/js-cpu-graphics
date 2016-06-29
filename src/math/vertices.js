@@ -52,6 +52,13 @@ export const Vector = template(n => {
       return to;
     }
 
+    assign(b) {
+      for (var i = 0; i < n; i++) {
+        _set_item(this, i, _get_item(b, i));
+      }
+      return this;
+    }
+
     clone() {
       return this.clone_to(new_vector());
     }
@@ -171,7 +178,7 @@ export const Vector = template(n => {
     }
 
     normal_by_last_to(to) {
-      return this.divide_to(this.w, to);
+      return this.divide_to(this.last, to);
     }
     normal_by_last() {
       return this.normal_by_last_to(new_vector());
