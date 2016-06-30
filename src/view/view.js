@@ -44,15 +44,17 @@ export class View {
     this.canvas = canvas;
     this.context = canvas.getContext("2d");
 
-    this.cuboid = new objects.Cuboid(4);
+    this.cuboids = new objects.ExplodedCuboid(4, 3, 6.0, 0.3);
+
+    const bufferSize = this.cuboids.pieces[0].sides[0].vertices.length;
     this.verticesMV = new ArrayView(
-      Vector4, this.cuboid.vertices.length
+      Vector4, bufferSize
     );
     this.verticesM = new ArrayView(
-      Vector4, this.cuboid.vertices.length
+      Vector4, bufferSize
     );
     this.verticesMVPn = new ArrayView(
-      Vector4, this.cuboid.vertices.length
+      Vector4, bufferSize
     );
 
     this.light_dir = Vector4.from(1, 1, 0, 0).normalized();
@@ -67,22 +69,32 @@ export class View {
 
   render(t) {
 
-    const common_rotation = Matrix5.rotation(2, 3, 0.296 * t)
-      .multiply(Matrix5.rotation(0, 3, 0.178 * t));
-    const mx4V = Matrix5.translation_from(0, 0, 0, 3);
+    const common_rotation = Matrix5.rotation(0, 3, 0.096 * t)
+      // .multiply(Matrix5.rotation(0, 2, 0.178 * t))
+      //.multiply(Matrix5.rotation(1, 3, 0.134 * t))
+    ;
+
+    /*
+    const mx4V = Matrix5.identity();
+    const mx4P = Matrix5.identity();
+    */
+
+
+    const mx4V = Matrix5.translation_from(0, 0, 0, 25);
     const mx4P = Matrix5.projection(0.3);
 
+
     // const mx3V = Matrix4.rotation(1, 2, -0.4).multiply(Matrix4.translation_from(0, 0, 15))
-    const mx3V = Matrix4.translation_from(0, 0, 15);
+    const mx3V = Matrix4.translation_from(0, 0, 18);
     const mx3P = Matrix4.projection(0.3).multiply(
       Matrix4.scaling_from(200, -200, 1, 1)
     ).multiply(
       Matrix4.translation_from(250, 250, 0)
     );
 
-    function draw_cube(tx, ty, tz, tw) {
+    function draw_cube(cuboid) {
 
-      const mx4M = Matrix5.translation_from(tx, ty, tz, tw).multiply(common_rotation);
+      const mx4M = common_rotation;
       const mx4MV = mx4M.multiply(mx4V);
       const mx4MVP = mx4MV.multiply(mx4P);
 
@@ -108,10 +120,10 @@ export class View {
           mx3P.multiply_vector_to(vMV, vMVP);
           vMVP.normal_by_last_to(vMVPn);
         },
-        this.cuboid.vertices, this.verticesM, this.verticesMV, this.verticesMVPn
+        cuboid.vertices, this.verticesM, this.verticesMV, this.verticesMVPn
       );
 
-      this.cuboid.faces.forEach(face => {
+      cuboid.faces.forEach(face => {
         const worldnormal = this.temp_vec4s[0];
         const center = this.temp_vec4s[1];
         const temp1 = this.temp_vec4s[2];
@@ -164,18 +176,11 @@ export class View {
 
     this.face_renderer.reset();
 
-    /*
-
-    for (var dx = -2; dx < 2; dx++) {
-      for (var dy = -2; dy < 2; dy++) {
-        for (var dz = -2; dz < 2; dz++) {
-          this::draw_cube((dx + 0.5) * 2.3, (dy + 0.5) * 2.3, (dz + 0.5) * 2.3);
-        }
-      }
-    }
-*/
-
-    this::draw_cube(0, 0, 0, 0);
+    this.cuboids.pieces.forEach(cuboidSides => {
+      cuboidSides.sides.forEach(cuboid => {
+        this::draw_cube(cuboid)
+      });
+    });
 
     this.face_renderer.render(this.context, this.canvas);
   }

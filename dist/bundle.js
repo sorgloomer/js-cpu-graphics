@@ -912,6 +912,94 @@
     return Cuboid;
   }();
 
+  var ExplodedCuboidPiece = function ExplodedCuboidPiece(name, sides) {
+    classCallCheck(this, ExplodedCuboidPiece);
+
+    this.name = name;
+    this.sides = sides;
+  };
+
+  var ExplodedCuboid = function () {
+    function ExplodedCuboid(n, dimension, explosion, gap) {
+      classCallCheck(this, ExplodedCuboid);
+
+      this.N = n;
+      this.dimension = dimension;
+      this.explosion = explosion;
+      this.gap = gap;
+      this.VectorN = Vector(n);
+      this.pieces = this._generatePieces();
+    }
+
+    createClass(ExplodedCuboid, [{
+      key: "_generatePieces",
+      value: function _generatePieces() {
+        var _this = this;
+        var indices = [];
+        var xmin = (1 - this.dimension) / 2;
+        var pieces = [];
+        var N = this.N,
+            Nm1 = this.N - 1,
+            Dm1 = this.dimension - 1;
+
+        recurse();
+        return pieces;
+
+        function recurse() {
+          if (indices.length >= N) {
+            var sides = [];
+            for (var i = 0; i < N; i++) {
+              var index = indices[i];
+              if (index <= 0) {
+                var side = new Cuboid(Nm1);
+                modifySide(side, i, -1 - _this.explosion);
+                sides.push(side);
+              }
+              if (index >= Dm1) {
+                var _side = new Cuboid(Nm1);
+                modifySide(_side, i, 1 + _this.explosion);
+                sides.push(_side);
+              }
+            }
+            if (sides.length > 0) {
+              var name = JSON.stringify(indices);
+              pieces.push(new ExplodedCuboidPiece(name, sides));
+            }
+          } else {
+            indices.push(0);
+            for (var _i = 0; _i < _this.dimension; _i++) {
+              indices[indices.length - 1] = _i;
+              recurse();
+            }
+            indices.pop();
+          }
+        }
+        function modifySide(side, dim, x) {
+          var vertices = side.vertices;
+          var newVertices = new ArrayView(_this.VectorN, vertices.length);
+          for (var i = 0, maxi = vertices.length; i < maxi; i++) {
+            var vertex = vertices.index(i);
+            var newVertex = newVertices.index(i);
+
+            for (var j = 0; j < dim; j++) {
+              newVertex.set_item(j, vertex.get_item(j));
+            }
+            newVertex.set_item(dim, 0);
+            for (var _j = dim; _j < N; _j++) {
+              newVertex.set_item(_j + 1, vertex.get_item(_j));
+            }
+            for (var _j2 = 0; _j2 < N; _j2++) {
+              newVertex.set_item(_j2, newVertex.get_item(_j2) + (indices[_j2] + xmin) * (2 + _this.gap));
+            }
+            newVertex.set_item(dim, newVertex.get_item(dim) + x);
+          }
+          side.vertices = newVertices;
+        }
+      }
+    }]);
+    return ExplodedCuboid;
+  }();
+
   var PointBuffer = function () {
     function PointBuffer() {
       classCallCheck(this, PointBuffer);
@@ -1136,10 +1224,12 @@
       this.canvas = canvas;
       this.context = canvas.getContext("2d");
 
-      this.cuboid = new Cuboid(4);
-      this.verticesMV = new ArrayView(Vector4, this.cuboid.vertices.length);
-      this.verticesM = new ArrayView(Vector4, this.cuboid.vertices.length);
-      this.verticesMVPn = new ArrayView(Vector4, this.cuboid.vertices.length);
+      this.cuboids = new ExplodedCuboid(4, 3, 6.0, 0.3);
+
+      var bufferSize = this.cuboids.pieces[0].sides[0].vertices.length;
+      this.verticesMV = new ArrayView(Vector4, bufferSize);
+      this.verticesM = new ArrayView(Vector4, bufferSize);
+      this.verticesMVPn = new ArrayView(Vector4, bufferSize);
 
       this.light_dir = Vector4.from(1, 1, 0, 0).normalized();
 
@@ -1153,19 +1243,29 @@
     createClass(View, [{
       key: "render",
       value: function render(t) {
+        var _this2 = this;
 
-        var common_rotation = Matrix5.rotation(2, 3, 0.296 * t).multiply(Matrix5.rotation(0, 3, 0.178 * t));
-        var mx4V = Matrix5.translation_from(0, 0, 0, 3);
+        var common_rotation = Matrix5.rotation(0, 3, 0.096 * t)
+        // .multiply(Matrix5.rotation(0, 2, 0.178 * t))
+        //.multiply(Matrix5.rotation(1, 3, 0.134 * t))
+        ;
+
+        /*
+        const mx4V = Matrix5.identity();
+        const mx4P = Matrix5.identity();
+        */
+
+        var mx4V = Matrix5.translation_from(0, 0, 0, 25);
         var mx4P = Matrix5.projection(0.3);
 
         // const mx3V = Matrix4.rotation(1, 2, -0.4).multiply(Matrix4.translation_from(0, 0, 15))
-        var mx3V = Matrix4.translation_from(0, 0, 15);
+        var mx3V = Matrix4.translation_from(0, 0, 18);
         var mx3P = Matrix4.projection(0.3).multiply(Matrix4.scaling_from(200, -200, 1, 1)).multiply(Matrix4.translation_from(250, 250, 0));
 
-        function draw_cube(tx, ty, tz, tw) {
+        function draw_cube(cuboid) {
           var _this = this;
 
-          var mx4M = Matrix5.translation_from(tx, ty, tz, tw).multiply(common_rotation);
+          var mx4M = common_rotation;
           var mx4MV = mx4M.multiply(mx4V);
           var mx4MVP = mx4MV.multiply(mx4P);
 
@@ -1189,9 +1289,9 @@
             mx3V.multiply_vector_to(v3M, vMV);
             mx3P.multiply_vector_to(vMV, vMVP);
             vMVP.normal_by_last_to(vMVPn);
-          }, this.cuboid.vertices, this.verticesM, this.verticesMV, this.verticesMVPn);
+          }, cuboid.vertices, this.verticesM, this.verticesMV, this.verticesMVPn);
 
-          this.cuboid.faces.forEach(function (face) {
+          cuboid.faces.forEach(function (face) {
             var worldnormal = _this.temp_vec4s[0];
             var center = _this.temp_vec4s[1];
             var temp1 = _this.temp_vec4s[2];
@@ -1243,17 +1343,11 @@
 
         this.face_renderer.reset();
 
-        /*
-          for (var dx = -2; dx < 2; dx++) {
-          for (var dy = -2; dy < 2; dy++) {
-            for (var dz = -2; dz < 2; dz++) {
-              this::draw_cube((dx + 0.5) * 2.3, (dy + 0.5) * 2.3, (dz + 0.5) * 2.3);
-            }
-          }
-        }
-        */
-
-        draw_cube.call(this, 0, 0, 0, 0);
+        this.cuboids.pieces.forEach(function (cuboidSides) {
+          cuboidSides.sides.forEach(function (cuboid) {
+            draw_cube.call(_this2, cuboid);
+          });
+        });
 
         this.face_renderer.render(this.context, this.canvas);
       }
