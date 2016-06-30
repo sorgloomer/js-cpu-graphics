@@ -41,10 +41,22 @@ export class IndexedIndexable {
 
 export class View {
   constructor(canvas) {
+
+    this.centerx = canvas.width / 2;
+    this.centery = canvas.height / 2;
+    this.mx = 0;
+    this.my = 0;
+
     this.canvas = canvas;
     this.context = canvas.getContext("2d");
 
-    this.cuboids = new objects.ExplodedCuboid(4, 3, 6.0, 0.3);
+    canvas.addEventListener("mousemove", evt => {
+      this.mx = (evt.clientX - this.centerx) / this.centerx;
+      this.my = (evt.clientY - this.centery) / this.centery;
+    });
+
+    this.N = 4;
+    this.cuboids = new objects.ExplodedCuboid(this.N, 3, 6.0, 0.3);
 
     const bufferSize = this.cuboids.pieces[0].sides[0].vertices.length;
     this.verticesMV = new ArrayView(
@@ -69,7 +81,7 @@ export class View {
 
   render(t) {
 
-    const common_rotation = Matrix5.rotation(0, 3, 0.096 * t)
+    const common_rotation = Matrix5.rotation(0, this.N - 1, 0.276 * t)
       // .multiply(Matrix5.rotation(0, 2, 0.178 * t))
       //.multiply(Matrix5.rotation(1, 3, 0.134 * t))
     ;
@@ -85,8 +97,11 @@ export class View {
 
 
     // const mx3V = Matrix4.rotation(1, 2, -0.4).multiply(Matrix4.translation_from(0, 0, 15))
-    const mx3V = Matrix4.translation_from(0, 0, 18);
-    const mx3P = Matrix4.projection(0.3).multiply(
+    const mx3V = Matrix4.rotation(0, 2, this.mx * 3)
+      .multiply(Matrix4.rotation(1, 2, this.my * 3))
+      .multiply(Matrix4.translation_from(0, 0, 12))
+    ;
+    const mx3P = Matrix4.projection(0.2).multiply(
       Matrix4.scaling_from(200, -200, 1, 1)
     ).multiply(
       Matrix4.translation_from(250, 250, 0)
@@ -110,6 +125,9 @@ export class View {
 
 
           src.clone_to(v4);
+          for (let i = this.N; i < 4; i++) {
+            v4.set_item(i, 0);
+          }
           v4.last = 1;
           mx4MVP.multiply_vector_to(v4, v4MVP);
           v4MVP.normal_by_last_to(v4MVPn);

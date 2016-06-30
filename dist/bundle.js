@@ -1219,12 +1219,26 @@
 
   var View = function () {
     function View(canvas) {
+      var _this = this;
+
       classCallCheck(this, View);
+
+
+      this.centerx = canvas.width / 2;
+      this.centery = canvas.height / 2;
+      this.mx = 0;
+      this.my = 0;
 
       this.canvas = canvas;
       this.context = canvas.getContext("2d");
 
-      this.cuboids = new ExplodedCuboid(4, 3, 6.0, 0.3);
+      canvas.addEventListener("mousemove", function (evt) {
+        _this.mx = (evt.clientX - _this.centerx) / _this.centerx;
+        _this.my = (evt.clientY - _this.centery) / _this.centery;
+      });
+
+      this.N = 4;
+      this.cuboids = new ExplodedCuboid(this.N, 3, 6.0, 0.3);
 
       var bufferSize = this.cuboids.pieces[0].sides[0].vertices.length;
       this.verticesMV = new ArrayView(Vector4, bufferSize);
@@ -1243,9 +1257,9 @@
     createClass(View, [{
       key: "render",
       value: function render(t) {
-        var _this2 = this;
+        var _this3 = this;
 
-        var common_rotation = Matrix5.rotation(0, 3, 0.096 * t)
+        var common_rotation = Matrix5.rotation(0, this.N - 1, 0.276 * t)
         // .multiply(Matrix5.rotation(0, 2, 0.178 * t))
         //.multiply(Matrix5.rotation(1, 3, 0.134 * t))
         ;
@@ -1259,11 +1273,11 @@
         var mx4P = Matrix5.projection(0.3);
 
         // const mx3V = Matrix4.rotation(1, 2, -0.4).multiply(Matrix4.translation_from(0, 0, 15))
-        var mx3V = Matrix4.translation_from(0, 0, 18);
-        var mx3P = Matrix4.projection(0.3).multiply(Matrix4.scaling_from(200, -200, 1, 1)).multiply(Matrix4.translation_from(250, 250, 0));
+        var mx3V = Matrix4.rotation(0, 2, this.mx * 3).multiply(Matrix4.rotation(1, 2, this.my * 3)).multiply(Matrix4.translation_from(0, 0, 12));
+        var mx3P = Matrix4.projection(0.2).multiply(Matrix4.scaling_from(200, -200, 1, 1)).multiply(Matrix4.translation_from(250, 250, 0));
 
         function draw_cube(cuboid) {
-          var _this = this;
+          var _this2 = this;
 
           var mx4M = common_rotation;
           var mx4MV = mx4M.multiply(mx4V);
@@ -1274,12 +1288,15 @@
 
 
           view_zip(function (src, v3M, vMV, vMVPn) {
-            var v4 = _this.temp_vec5s[0];
-            var v4MVP = _this.temp_vec5s[1];
-            var v4MVPn = _this.temp_vec5s[2];
-            var vMVP = _this.temp_vec4s[1];
+            var v4 = _this2.temp_vec5s[0];
+            var v4MVP = _this2.temp_vec5s[1];
+            var v4MVPn = _this2.temp_vec5s[2];
+            var vMVP = _this2.temp_vec4s[1];
 
             src.clone_to(v4);
+            for (var i = _this2.N; i < 4; i++) {
+              v4.set_item(i, 0);
+            }
             v4.last = 1;
             mx4MVP.multiply_vector_to(v4, v4MVP);
             v4MVP.normal_by_last_to(v4MVPn);
@@ -1292,18 +1309,18 @@
           }, cuboid.vertices, this.verticesM, this.verticesMV, this.verticesMVPn);
 
           cuboid.faces.forEach(function (face) {
-            var worldnormal = _this.temp_vec4s[0];
-            var center = _this.temp_vec4s[1];
-            var temp1 = _this.temp_vec4s[2];
-            var temp2 = _this.temp_vec4s[3];
-            var temp3 = _this.temp_vec4s[4];
+            var worldnormal = _this2.temp_vec4s[0];
+            var center = _this2.temp_vec4s[1];
+            var temp1 = _this2.temp_vec4s[2];
+            var temp2 = _this2.temp_vec4s[3];
+            var temp3 = _this2.temp_vec4s[4];
 
-            _this.indexer.indices = face;
-            _this.indexer.buffer = _this.verticesM;
+            _this2.indexer.indices = face;
+            _this2.indexer.buffer = _this2.verticesM;
 
-            temp3.assign(_this.indexer.index(0));
-            temp1.assign(_this.indexer.index(1));
-            temp2.assign(_this.indexer.index(2));
+            temp3.assign(_this2.indexer.index(0));
+            temp1.assign(_this2.indexer.index(1));
+            temp2.assign(_this2.indexer.index(2));
 
             temp1.sub_to(temp3, temp1);
             temp2.sub_to(temp3, temp2);
@@ -1311,20 +1328,20 @@
             temp3.set_item(3, 0);
             temp3.normalized_to(worldnormal);
 
-            _this.indexer.buffer = _this.verticesMV;
-            Vector4.average_to(_this.indexer, center);
+            _this2.indexer.buffer = _this2.verticesMV;
+            Vector4.average_to(_this2.indexer, center);
 
-            var cosa = worldnormal.dot(_this.light_dir);
+            var cosa = worldnormal.dot(_this2.light_dir);
             var diffuse = abs(cosa);
 
             temp1.assign(center).normalized_to(temp1).scale_to(-1, temp1);
-            temp1.add_to(_this.light_dir, temp1).normalized_to(temp1);
+            temp1.add_to(_this2.light_dir, temp1).normalized_to(temp1);
             var coss = temp1.dot(worldnormal);
             var specular = pow(abs(coss), 5);
 
             var intensity = Math.max(0, diffuse) * 0.2 + 0.5;
 
-            var primitive = _this.face_renderer.add_face(_this.verticesMVPn, face);
+            var primitive = _this2.face_renderer.add_face(_this2.verticesMVPn, face);
 
             primitive.fr = intensity * 0.50;
             primitive.fg = intensity * 0.85;
@@ -1345,7 +1362,7 @@
 
         this.cuboids.pieces.forEach(function (cuboidSides) {
           cuboidSides.sides.forEach(function (cuboid) {
-            draw_cube.call(_this2, cuboid);
+            draw_cube.call(_this3, cuboid);
           });
         });
 
